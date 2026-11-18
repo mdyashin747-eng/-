@@ -1,0 +1,194 @@
+{
+  "entities": {
+    "Donation": {
+      "title": "Donation",
+      "description": "Private donor submission record including full phone number and full TrxID for admin verification.",
+      "type": "object",
+      "properties": {
+        "receiptNo": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 32,
+          "pattern": "^SF-2026-[0-9A-Z]+$"
+        },
+        "donorName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 20,
+          "pattern": "^01[0-9]{9}$"
+        },
+        "campaignId": {
+          "type": "string",
+          "enum": ["food", "education", "medical", "winter", "mosque", "general"]
+        },
+        "campaignTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "amount": {
+          "type": "number"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["bkash", "nagad", "rocket"]
+        },
+        "trxId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "verified", "rejected"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "receiptNo",
+        "donorName",
+        "phone",
+        "campaignId",
+        "campaignTitle",
+        "amount",
+        "method",
+        "trxId",
+        "status",
+        "createdAt"
+      ]
+    },
+    "PublicDonation": {
+      "title": "PublicDonation",
+      "description": "Public transparency ledger entry with PII stripped (no phone number, masked TrxID).",
+      "type": "object",
+      "properties": {
+        "receiptNo": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 32,
+          "pattern": "^SF-2026-[0-9A-Z]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "campaignId": {
+          "type": "string",
+          "enum": ["food", "education", "medical", "winter", "mosque", "general"]
+        },
+        "campaignTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "amount": {
+          "type": "number"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["bkash", "nagad", "rocket"]
+        },
+        "maskedTrxId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "verified", "rejected"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "receiptNo",
+        "displayName",
+        "campaignId",
+        "campaignTitle",
+        "amount",
+        "method",
+        "maskedTrxId",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Volunteer": {
+      "title": "Volunteer",
+      "description": "Private volunteer application containing applicant phone number and district.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 20,
+          "pattern": "^01[0-9]{9}$"
+        },
+        "district": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "focusArea": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "contacted", "approved"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["name", "phone", "district", "focusArea", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/donations/{donationId}": {
+      "schema": { "$ref": "#/entities/Donation" },
+      "description": "Private donor records (PII) readable and manageable only by verified admins."
+    },
+    "/publicDonations/{donationId}": {
+      "schema": { "$ref": "#/entities/PublicDonation" },
+      "description": "Public transparency ledger entries without PII."
+    },
+    "/volunteers/{volunteerId}": {
+      "schema": { "$ref": "#/entities/Volunteer" },
+      "description": "Private volunteer applications readable and manageable only by verified admins."
+    }
+  }
+}

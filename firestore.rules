@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'mdyashin747@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidCampaignId(val) {
+      return val is string && val in ['food', 'education', 'medical', 'winter', 'mosque', 'general'];
+    }
+
+    function isValidMethod(val) {
+      return val is string && val in ['bkash', 'nagad', 'rocket'];
+    }
+
+    function isValidDonationStatus(val) {
+      return val is string && val in ['pending', 'verified', 'rejected'];
+    }
+
+    function isValidVolunteerStatus(val) {
+      return val is string && val in ['pending', 'contacted', 'approved'];
+    }
+
+    function isValidDonation(data) {
+      return data.keys().hasAll([
+          'receiptNo', 'donorName', 'phone', 'campaignId',
+          'campaignTitle', 'amount', 'method', 'trxId', 'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'receiptNo', 'donorName', 'phone', 'campaignId',
+          'campaignTitle', 'amount', 'method', 'trxId', 'note', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.receiptNo is string && data.receiptNo.size() >= 5 && data.receiptNo.size() <= 32
+        && data.receiptNo.matches('^SF-2026-[0-9A-Z]+$')
+        && data.donorName is string && data.donorName.size() >= 2 && data.donorName.size() <= 80
+        && data.phone is string && data.phone.size() >= 11 && data.phone.size() <= 20
+        && data.phone.matches('^01[0-9]{9}$')
+        && isValidCampaignId(data.campaignId)
+        && data.campaignTitle is string && data.campaignTitle.size() >= 2 && data.campaignTitle.size() <= 80
+        && data.amount is number && data.amount >= 10 && data.amount <= 10000000
+        && isValidMethod(data.method)
+        && data.trxId is string && data.trxId.size() >= 4 && data.trxId.size() <= 40
+        && (!('note' in data) || (data.note is string && data.note.size() <= 300))
+        && isValidDonationStatus(data.status)
+        && data.createdAt is timestamp
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidPublicDonation(data) {
+      return data.keys().hasAll([
+          'receiptNo', 'displayName', 'campaignId',
+          'campaignTitle', 'amount', 'method', 'maskedTrxId', 'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'receiptNo', 'displayName', 'campaignId',
+          'campaignTitle', 'amount', 'method', 'maskedTrxId', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.receiptNo is string && data.receiptNo.size() >= 5 && data.receiptNo.size() <= 32
+        && data.receiptNo.matches('^SF-2026-[0-9A-Z]+$')
+        && data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 80
+        && isValidCampaignId(data.campaignId)
+        && data.campaignTitle is string && data.campaignTitle.size() >= 2 && data.campaignTitle.size() <= 80
+        && data.amount is number && data.amount >= 10 && data.amount <= 10000000
+        && isValidMethod(data.method)
+        && data.maskedTrxId is string && data.maskedTrxId.size() >= 4 && data.maskedTrxId.size() <= 40
+        && isValidDonationStatus(data.status)
+        && data.createdAt is timestamp
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidVolunteer(data) {
+      return data.keys().hasAll([
+          'name', 'phone', 'district', 'focusArea', 'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'name', 'phone', 'district', 'focusArea', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.phone is string && data.phone.size() >= 11 && data.phone.size() <= 20
+        && data.phone.matches('^01[0-9]{9}$')
+        && data.district is string && data.district.size() >= 2 && data.district.size() <= 40
+        && data.focusArea is string && data.focusArea.size() >= 2 && data.focusArea.size() <= 80
+        && isValidVolunteerStatus(data.status)
+        && data.createdAt is timestamp
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // Connectivity check endpoint
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Admin registry (read-only for self-check)
+    match /admins/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    // Private donor submissions (contains phone & full TrxID — strictly admin-only read)
+    match /donations/{donationId} {
+      allow get: if isSignedIn() && isValidId(donationId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(donationId)
+        && isValidDonation(incoming())
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && !('updatedAt' in incoming())
+        && existsAfter(/databases/$(database)/documents/publicDonations/$(donationId));
+      allow update: if isSignedIn()
+        && isValidId(donationId)
+        && isValidDonation(incoming())
+        && isAdmin()
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(donationId) && isAdmin();
+    }
+
+    // Public transparency ledger (PII stripped)
+    match /publicDonations/{donationId} {
+      allow get: if isValidId(donationId);
+      allow list: if resource.data.status in ['pending', 'verified'];
+      allow create: if isValidId(donationId)
+        && isValidPublicDonation(incoming())
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && !('updatedAt' in incoming())
+        && existsAfter(/databases/$(database)/documents/donations/$(donationId));
+      allow update: if isSignedIn()
+        && isValidId(donationId)
+        && isValidPublicDonation(incoming())
+        && isAdmin()
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(donationId) && isAdmin();
+    }
+
+    // Private volunteer applications (contains phone — strictly admin-only read)
+    match /volunteers/{volunteerId} {
+      allow get: if isSignedIn() && isValidId(volunteerId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(volunteerId)
+        && isValidVolunteer(incoming())
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && !('updatedAt' in incoming());
+      allow update: if isSignedIn()
+        && isValidId(volunteerId)
+        && isValidVolunteer(incoming())
+        && isAdmin()
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(volunteerId) && isAdmin();
+    }
+  }
+}

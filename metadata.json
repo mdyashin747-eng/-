@@ -1,0 +1,6 @@
+{
+  "name": "সেবা ফাউন্ডেশন",
+  "description": "অসহায় ও দুস্থ মানুষের জন্য তহবিল সংগ্রহের উদ্যোগ। খাদ্য, শিক্ষা, চিকিৎসা ও শীতবস্ত্র — আপনার ছোট্ট অনুদান বদলে দিতে পারে একটা জীবন।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
